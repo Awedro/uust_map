@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кампус МИГ-19 · A* · этажи</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue:    #0A84FF;
+    --green:   #30D158;
+    --red:     #FF453A;
+    --orange:  #FF9F0A;
+    --yellow:  #FFD60A;
+    --indigo:  #5E5CE6;
+    --bg:      #000000;
+    --card:    #1C1C1E;
+    --card-2:  #2C2C2E;
+    --card-3:  #3A3A3C;
+    --label:   #FFFFFF;
+    --label-2: rgba(235,235,245,0.6);
+    --label-3: rgba(235,235,245,0.3);
+    --sep-2:   rgba(84,84,88,0.32);
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                 "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+    background: var(--bg); color: var(--label);
+    overflow: hidden; -webkit-font-smoothing: antialiased;
+  }
+
+  .app { height: 100vh; display: grid; grid-template-rows: auto 1fr; gap: 14px; padding: 16px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--sep-2);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.55), inset 0 0.5px 0 rgba(255,255,255,0.08);
+    overflow: hidden; position: relative;
+  }
+
+  header { display: flex; align-items: center; gap: 14px; padding: 14px 22px; flex-wrap: wrap; }
+  .app-icon {
+    width: 40px; height: 40px; border-radius: 11px;
+    background: linear-gradient(135deg, #0A84FF, #5E5CE6);
+    display: grid; place-items: center; color: #fff; font-size: 20px;
+    box-shadow: 0 6px 20px rgba(10,132,255,0.4), inset 0 1px 0 rgba(255,255,255,0.4);
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.022em; }
+  header .sub { font-size: 0.75rem; color: var(--label-2); font-weight: 500; margin-top: 1px; }
+  header .badge {
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 5px 11px; border-radius: 999px;
+    background: rgba(10,132,255,0.16); color: #66B8FF; font-weight: 700;
+    border: 0.5px solid rgba(10,132,255,0.4);
+  }
+  header .spacer { flex: 1; }
+  header .stat {
+    font-size: 0.78rem; color: var(--label-2);
+    padding: 8px 14px; border-radius: 11px;
+    background: var(--card-2); border: 0.5px solid var(--sep-2);
+    font-variant-numeric: tabular-nums;
+  }
+  header .stat b { color: var(--blue); font-weight: 700; }
+
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 14px; min-height: 0; }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+    html, body { overflow: auto; }
+    .app { height: auto; min-height: 100vh; }
+  }
+
+  .sidebar { padding: 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  .section-title {
+    font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--label-3);
+    font-weight: 700; padding-left: 4px;
+  }
+  .field { display: flex; flex-direction: column; gap: 7px; }
+  .field label {
+    font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--label-2);
+    font-weight: 700; padding-left: 4px;
+  }
+  select {
+    font-family: inherit; font-size: 0.92rem; font-weight: 600;
+    padding: 12px 40px 12px 15px; border-radius: 12px;
+    border: 0.5px solid var(--sep-2); background: var(--card-2);
+    color: var(--label); cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5L6 6.5L11 1.5' fill='none' stroke='%230A84FF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat; background-position: right 14px center;
+  }
+  select:hover { background-color: var(--card-3); }
+  select:focus { outline: none; border-color: rgba(10,132,255,0.7); box-shadow: 0 0 0 3.5px rgba(10,132,255,0.22); }
+  select option { background: var(--card-2); color: #fff; }
+
+  .swap-wrap { display: flex; justify-content: center; margin: -4px 0; }
+  .swap-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--card-2); border: 0.5px solid var(--sep-2);
+    color: var(--blue); cursor: pointer; font-size: 1rem;
+    transition: transform 0.35s cubic-bezier(0.2,0.9,0.4,1);
+  }
+  .swap-btn:hover { transform: rotate(180deg); }
+
+  .btn {
+    font-family: inherit; font-size: 0.92rem; font-weight: 600;
+    padding: 12px 18px; border-radius: 12px;
+    border: 0.5px solid var(--sep-2); background: var(--card-2);
+    color: var(--label); cursor: pointer;
+    transition: background-color 0.2s, transform 0.15s;
+  }
+  .btn:hover { background: var(--card-3); }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--blue); color: #fff; border: none;
+    box-shadow: 0 4px 14px rgba(10,132,255,0.4);
+  }
+  .btn-primary:hover { background: #3B9BFF; }
+  .btn-row { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+
+  /* Toggle-кнопка */
+  .toggle-btn {
+    width: 100%; display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-radius: 14px;
+    background: var(--card-2);
+    border: 2px solid var(--sep-2);
+    color: var(--label); cursor: pointer;
+    font-family: inherit; text-align: left;
+    transition: all 0.2s ease;
+  }
+  .toggle-btn:hover { background: var(--card-3); }
+  .toggle-btn.active {
+    background: linear-gradient(135deg, rgba(94,92,230,0.24), rgba(10,132,255,0.14));
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 4px rgba(94,92,230,0.18);
+  }
+  .toggle-btn .tg-icon {
+    font-size: 1.4rem; flex-shrink: 0;
+    transition: transform 0.2s;
+  }
+  .toggle-btn.active .tg-icon { transform: scale(1.15); }
+  .toggle-btn .tg-body {
+    flex: 1; display: flex; flex-direction: column; gap: 2px;
+  }
+  .toggle-btn .tg-title {
+    font-size: 0.94rem; font-weight: 700; letter-spacing: -0.01em;
+  }
+  .toggle-btn .tg-hint {
+    font-size: 0.72rem; font-weight: 500;
+    color: var(--label-2); transition: color 0.2s;
+  }
+  .toggle-btn.active .tg-hint { color: #A8B8FF; }
+  .toggle-btn .tg-state {
+    font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+    padding: 4px 10px; border-radius: 999px;
+    background: rgba(255,255,255,0.08); color: var(--label-2);
+    flex-shrink: 0; transition: all 0.2s;
+  }
+  .toggle-btn.active .tg-state {
+    background: var(--indigo); color: #fff;
+  }
+
+  .btn-play {
+    display: none; width: 100%;
+    background: linear-gradient(135deg, #30D158, #248A3D);
+    color: #fff; border: none;
+    box-shadow: 0 4px 14px rgba(48,209,88,0.4);
+    font-size: 0.94rem; font-weight: 700;
+    padding: 12px 18px; border-radius: 12px;
+    cursor: pointer; transition: transform 0.15s;
+  }
+  .btn-play.visible { display: block; }
+  .btn-play:hover { transform: translateY(-1px); }
+  .btn-play.playing { background: linear-gradient(135deg, #FF453A, #D70015); }
+
+  .status {
+    font-size: 0.84rem; line-height: 1.45;
+    padding: 13px 15px 13px 44px; border-radius: 12px;
+    background: var(--card-2); border: 0.5px solid var(--sep-2);
+    position: relative;
+  }
+  .status::before {
+    content: ""; position: absolute;
+    left: 14px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--blue);
+  }
+  .status::after {
+    content: "→"; position: absolute;
+    left: 14px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 20px;
+    display: grid; place-items: center;
+    color: #fff; font-size: 0.72rem; font-weight: 700;
+  }
+  .status.success { background: rgba(48,209,88,0.14); border-color: rgba(48,209,88,0.35); }
+  .status.success::before { background: var(--green); }
+  .status.success::after { content: "✓"; }
+  .status.error { background: rgba(255,69,58,0.14); border-color: rgba(255,69,58,0.35); }
+  .status.error::before { background: var(--red); }
+  .status.error::after { content: "!"; }
+
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; font-size: 0.76rem; color: var(--label-2); }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+  .dot.start { background: var(--blue); box-shadow: 0 0 0 2px #fff; }
+  .dot.goal  { background: var(--red); box-shadow: 0 0 0 2px #fff; }
+  .dot.path  { background: var(--blue); }
+  .dot.poi   { background: #fff; border: 1px solid var(--card-3); }
+  .dot.stair { background: var(--orange); }
+  .dot.pass  { background: var(--yellow); }
+
+  .map-panel { display: flex; flex-direction: column; padding: 16px; overflow: hidden; min-height: 0; }
+  .map-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; flex-wrap: wrap; gap: 10px;
+  }
+  .map-title { font-size: 1rem; font-weight: 700; }
+  .map-head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .floor-selector {
+    display: inline-flex; background: var(--card-2);
+    border-radius: 10px; padding: 2px; gap: 2px;
+  }
+  .floor-selector button {
+    padding: 6px 14px; border-radius: 8px;
+    background: transparent; border: none;
+    color: var(--label-2); font-weight: 700;
+    font-size: 0.82rem; cursor: pointer;
+    transition: all 0.15s; font-family: inherit;
+  }
+  .floor-selector button:hover { color: var(--label); }
+  .floor-selector button.active {
+    background: var(--card-3); color: var(--label);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+
+  .coord {
+    font-size: 0.76rem; color: var(--label-2);
+    padding: 6px 12px; border-radius: 10px;
+    background: var(--card-2); border: 0.5px solid var(--sep-2);
+  }
+
+  .floor-hint {
+    font-size: 0.72rem; color: var(--label-2);
+    padding: 6px 10px; border-radius: 8px;
+    background: rgba(255,214,10,0.10);
+    border: 0.5px solid rgba(255,214,10,0.35);
+  }
+  .floor-hint b { color: var(--yellow); }
+
+  .map-viewport {
+    flex: 1; min-height: 0; border-radius: 14px; overflow: hidden;
+    background: #0D0D0F; border: 0.5px solid var(--sep-2);
+    position: relative;
+  }
+  #map { display: block; width: 100%; height: 100%; user-select: none; }
+
+  #floorOverlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.72);
+    display: grid; place-items: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 10;
+  }
+  #floorOverlay.visible { opacity: 1; }
+  .floor-overlay-badge {
+    font-size: 2.8rem; font-weight: 800; letter-spacing: -0.03em;
+    color: #FFFFFF; text-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    transform: scale(0.9);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+  }
+  #floorOverlay.visible .floor-overlay-badge { transform: scale(1); }
+
+  .poi-inner { cursor: pointer; transition: transform 0.18s; transform-origin: 0 0; transform-box: fill-box; }
+  .poi-inner:hover { transform: scale(1.22); }
+
+  .start-marker, .end-marker { pointer-events: none; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6)); }
+
+  .streets-label {
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 11px; font-weight: 600;
+    fill: var(--label-2); letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .building-label {
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 13px; font-weight: 700;
+    fill: rgba(255,255,255,0.9);
+    letter-spacing: 0.02em; pointer-events: none;
+  }
+  .stair-icon {
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 11px; font-weight: 700;
+    fill: #fff; pointer-events: none;
+  }
+  .floor-badge-text {
+    font-family: -apple-system, "SF Pro Text", sans-serif;
+    font-size: 10px; font-weight: 700;
+    fill: #fff; pointer-events: none;
+  }
+
+  @keyframes passPulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+  }
+  .pass-line { animation: passPulse 2.2s ease-in-out infinite; }
+
+  @keyframes passGlowPulse {
+    0%, 100% { opacity: 0.35; }
+    50%      { opacity: 0.12; }
+  }
+  .pass-bg { animation: passGlowPulse 2.2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="card">
+    <div class="app-icon">🗺️</div>
+    <div>
+      <h1>Кампус МИГ-19</h1>
+      <div class="sub">ул. Карла Маркса · поиск маршрута</div>
+    </div>
+    <span class="badge">A* · 5 этажей</span>
+    <div class="spacer"></div>
+    <div class="stat" id="perfStat">—</div>
+  </header>
+
+  <main>
+    <aside class="sidebar card">
+      <div class="section-title">Маршрут</div>
+
+      <div class="field">
+        <label for="startSelect">Откуда</label>
+        <select id="startSelect"></select>
+      </div>
+
+      <div class="swap-wrap">
+        <button class="swap-btn" id="swapBtn">⇅</button>
+      </div>
+
+      <div class="field">
+        <label for="goalSelect">Куда</label>
+        <select id="goalSelect"></select>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="buildBtn">Построить</button>
+        <button class="btn" id="resetBtn">Сброс</button>
+      </div>
+
+      <button class="toggle-btn" id="indoorOnlyBtn" type="button">
+        <span class="tg-icon">🏢</span>
+        <span class="tg-body">
+          <span class="tg-title">Только внутри корпусов</span>
+          <span class="tg-hint" id="indoorOnlyHint">Обычный маршрут (можно по улице)</span>
+        </span>
+        <span class="tg-state" id="indoorOnlyState">ВЫКЛ</span>
+      </button>
+
+      <button class="btn-play" id="playBtn">▶ Воспроизвести по этажам</button>
+
+      <div class="status" id="status">Выберите точки и нажмите «Построить».</div>
+
+      <div class="section-title">Легенда</div>
+      <div class="legend">
+        <div class="legend-item"><span class="dot start"></span>Старт</div>
+        <div class="legend-item"><span class="dot goal"></span>Цель</div>
+        <div class="legend-item"><span class="dot path"></span>Маршрут</div>
+        <div class="legend-item"><span class="dot poi"></span>Точка интереса</div>
+        <div class="legend-item"><span class="dot stair"></span>Лестница</div>
+        <div class="legend-item"><span class="dot pass"></span>Переход</div>
+      </div>
+    </aside>
+
+    <section class="map-panel card">
+      <div class="map-head">
+        <span class="map-title">Схема кампуса</span>
+        <div class="map-head-right">
+          <span class="floor-hint">Переходы: <b>этажи 1, 2, 3, 5</b></span>
+          <div class="floor-selector" id="floorSelector">
+            <button data-floor="1" class="active">1</button>
+            <button data-floor="2">2</button>
+            <button data-floor="3">3</button>
+            <button data-floor="4">4</button>
+            <button data-floor="5">5</button>
+          </div>
+          <span class="coord" id="hoverCoords">—</span>
+        </div>
+      </div>
+      <div class="map-viewport">
+        <svg id="map" viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet"></svg>
+        <div id="floorOverlay">
+          <div class="floor-overlay-badge" id="floorOverlayBadge">Этаж 1</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   ЗДАНИЯ
+   ============================================================ */
+const BUILDINGS = {
+  k1: { shape: "rect", x: 170, y: 460, w: 400, h: 90,  fill: "#5E5CE6", label: "К1", floors: [1,2,3] },
+  k2: { shape: "rect", x: 245, y: 220, w: 100, h: 220, fill: "#FF9F0A", label: "К2", floors: [1,2] },
+  k3: { shape: "rect", x: 60,  y: 220, w: 170, h: 220, fill: "#30D158", label: "К3", floors: [1,2,3] },
+  k4: { shape: "rect", x: 60,  y: 90,  w: 170, h: 100, fill: "#FF9F0A", label: "К4", floors: [1,2] },
+  k5: { shape: "rect", x: 240, y: 100, w: 55,  h: 45,  fill: "#FF9F0A", label: "К5", floors: [1] },
+  k6: { shape: "rect", x: 310, y: 90,  w: 180, h: 100, fill: "#FFB340", label: "К6", floors: [1,2] },
+  k7: { shape: "rect", x: 510, y: 90,  w: 280, h: 100, fill: "#8E8E93", label: "К7", floors: [1,2,3] },
+  k8: { shape: "poly", d: "M 880,140 L 1080,140 L 1080,270 L 980,270 L 980,440 L 880,440 Z",
+        fill: "#248A3D", label: "К8", floors: [1,2,3,4,5], labelX: 980, labelY: 210 },
+  k9: { shape: "rect", x: 590, y: 460, w: 300, h: 90, fill: "#8E8E93", label: "К9", floors: [1,2,3,4,5] }
+};
+
+/* ============================================================
+   УЗЛЫ
+   ============================================================ */
+const NODES = {
+  STR_T: { x: 500, y: 42, floor: 1, poi: true, emoji: "🚌", name: "Ост. ЦУМ" },
+  STR_L: { x: 22,  y: 330, floor: 1, poi: true, emoji: "🚌", name: "Ост. Дом Актёра" },
+  STR_R: { x: 1180, y: 330, floor: 1 },
+  STR_B: { x: 500, y: 680, floor: 1 },
+
+  GJ_TL: { x: 100, y: 250, floor: 1 }, GJ_TM: { x: 500, y: 250, floor: 1 }, GJ_TR: { x: 900, y: 250, floor: 1 },
+  GJ_ML: { x: 100, y: 400, floor: 1 }, GJ_MM: { x: 500, y: 400, floor: 1 }, GJ_MR: { x: 900, y: 400, floor: 1 },
+  GJ_BL: { x: 100, y: 580, floor: 1 }, GJ_BM: { x: 500, y: 580, floor: 1 }, GJ_BR: { x: 900, y: 580, floor: 1 },
+
+  D_k1: { x: 570, y: 460, floor: 1, building: "k1" },
+  D_k2: { x: 295, y: 440, floor: 1, building: "k2" },
+  D_k3: { x: 230, y: 330, floor: 1, building: "k3" },
+  D_k4: { x: 145, y: 190, floor: 1, building: "k4" },
+  D_k5: { x: 267, y: 145, floor: 1, building: "k5" },
+  D_k6: { x: 400, y: 190, floor: 1, building: "k6" },
+  D_k7: { x: 650, y: 190, floor: 1, building: "k7" },
+  D_k8: { x: 880, y: 205, floor: 1, building: "k8" },
+  D_k9: { x: 890, y: 460, floor: 1, building: "k9" },
+
+  S_k1_f1: { x: 540, y: 490, floor: 1, building: "k1", stairs: true },
+  S_k1_f2: { x: 540, y: 490, floor: 2, building: "k1", stairs: true },
+  S_k1_f3: { x: 540, y: 490, floor: 3, building: "k1", stairs: true },
+
+  S_k2_f1: { x: 280, y: 410, floor: 1, building: "k2", stairs: true },
+  S_k2_f2: { x: 280, y: 410, floor: 2, building: "k2", stairs: true },
+
+  S_k3_f1: { x: 200, y: 330, floor: 1, building: "k3", stairs: true },
+  S_k3_f2: { x: 200, y: 330, floor: 2, building: "k3", stairs: true },
+  S_k3_f3: { x: 200, y: 330, floor: 3, building: "k3", stairs: true },
+
+  S_k4_f1: { x: 145, y: 160, floor: 1, building: "k4", stairs: true },
+  S_k4_f2: { x: 145, y: 160, floor: 2, building: "k4", stairs: true },
+
+  S_k5_f1: { x: 267, y: 118, floor: 1, building: "k5", stairs: true },
+
+  S_k6_f1: { x: 460, y: 160, floor: 1, building: "k6", stairs: true },
+  S_k6_f2: { x: 460, y: 160, floor: 2, building: "k6", stairs: true },
+
+  S_k7_f1: { x: 750, y: 160, floor: 1, building: "k7", stairs: true },
+  S_k7_f2: { x: 750, y: 160, floor: 2, building: "k7", stairs: true },
+  S_k7_f3: { x: 750, y: 160, floor: 3, building: "k7", stairs: true },
+
+  S_k8_f1: { x: 920, y: 400, floor: 1, building: "k8", stairs: true },
+  S_k8_f2: { x: 920, y: 400, floor: 2, building: "k8", stairs: true },
+  S_k8_f3: { x: 920, y: 400, floor: 3, building: "k8", stairs: true },
+  S_k8_f4: { x: 920, y: 400, floor: 4, building: "k8", stairs: true },
+  S_k8_f5: { x: 920, y: 400, floor: 5, building: "k8", stairs: true },
+
+  S_k9_f1: { x: 700, y: 490, floor: 1, building: "k9", stairs: true },
+  S_k9_f2: { x: 700, y: 490, floor: 2, building: "k9", stairs: true },
+  S_k9_f3: { x: 700, y: 490, floor: 3, building: "k9", stairs: true },
+  S_k9_f4: { x: 700, y: 490, floor: 4, building: "k9", stairs: true },
+  S_k9_f5: { x: 700, y: 490, floor: 5, building: "k9", stairs: true },
+
+  P_k1_f1_med:     { x: 250, y: 505, floor: 1, building: "k1", poi: true, emoji: "🩺", name: "Медпункт 1-125" },
+  P_k1_f1_profkom: { x: 370, y: 505, floor: 1, building: "k1", poi: true, emoji: "📋", name: "Профком 1-129" },
+  P_k1_f2_buh:     { x: 370, y: 505, floor: 2, building: "k1", poi: true, emoji: "💼", name: "Бухгалтерия (2 эт.)" },
+  P_k1_f3_lang:    { x: 370, y: 505, floor: 3, building: "k1", poi: true, emoji: "📚", name: "Каф. ин. яз. (3 эт.)" },
+  P_k2_f2_bufet:   { x: 295, y: 300, floor: 2, building: "k2", poi: true, emoji: "☕", name: "Буфет К2 (2 эт.)" },
+  P_k3_f2_stol:    { x: 145, y: 330, floor: 2, building: "k3", poi: true, emoji: "🍽️", name: "Столовая (2 эт.)" },
+  P_k3_f3_akt:     { x: 100, y: 280, floor: 3, building: "k3", poi: true, emoji: "🎭", name: "Актовый зал (3 эт.)" },
+  P_k3_f3_fiz:     { x: 100, y: 380, floor: 3, building: "k3", poi: true, emoji: "🏀", name: "Физвоспитание (3 эт.)" },
+  P_k4_f1_bufet:   { x: 145, y: 140, floor: 1, building: "k4", poi: true, emoji: "☕", name: "Буфет К4 (1 эт.)" },
+  P_k5_f1:         { x: 267, y: 122, floor: 1, building: "k5", poi: true, emoji: "🏛️", name: "Корпус 5" },
+  P_k6_f2_priem:   { x: 370, y: 140, floor: 2, building: "k6", poi: true, emoji: "📝", name: "Приёмная комиссия" },
+  P_k6_f2_bufet:   { x: 430, y: 140, floor: 2, building: "k6", poi: true, emoji: "☕", name: "Буфет К6 (2 эт.)" },
+  P_k7_f2_lib:     { x: 650, y: 140, floor: 2, building: "k7", poi: true, emoji: "📖", name: "Библиотека (2 эт.)" },
+  P_k7_f3_lib:     { x: 650, y: 140, floor: 3, building: "k7", poi: true, emoji: "📖", name: "Библиотека (3 эт.)" },
+  P_k8_f2_bufet:   { x: 980, y: 240, floor: 2, building: "k8", poi: true, emoji: "☕", name: "Буфет К8 (2 эт.)" },
+  P_k8_f4_lab1:    { x: 1000, y: 200, floor: 4, building: "k8", poi: true, emoji: "🔬", name: "Лаборатория 8-401" },
+  P_k8_f4_lab2:    { x: 1000, y: 320, floor: 4, building: "k8", poi: true, emoji: "🧪", name: "Лаборатория 8-402" },
+  P_k8_f5_lect:    { x: 1000, y: 200, floor: 5, building: "k8", poi: true, emoji: "🎓", name: "Аудитория 8-501" },
+  P_k8_f5_lab:     { x: 1000, y: 320, floor: 5, building: "k8", poi: true, emoji: "💻", name: "Комп. класс 8-502" },
+  P_k9_f2:         { x: 740, y: 505, floor: 2, building: "k9", poi: true, emoji: "🏛️", name: "Корпус 9 (2 эт.)" },
+  P_k9_f4_aud1:    { x: 700, y: 480, floor: 4, building: "k9", poi: true, emoji: "📖", name: "Аудитория 9-401" },
+  P_k9_f4_aud2:    { x: 800, y: 480, floor: 4, building: "k9", poi: true, emoji: "🎨", name: "Аудитория 9-402" },
+  P_k9_f5_aud1:    { x: 700, y: 480, floor: 5, building: "k9", poi: true, emoji: "🎓", name: "Аудитория 9-501" },
+  P_k9_f5_aud2:    { x: 800, y: 480, floor: 5, building: "k9", poi: true, emoji: "💡", name: "Студ. офис 9-502" },
+
+  O_entrance: { x: 400, y: 400, floor: 1, poi: true, emoji: "🚪", name: "Главный вход" },
+  O_mig:      { x: 500, y: 220, floor: 1, poi: true, emoji: "✈️", name: "МИГ-19" },
+  O_banket:   { x: 700, y: 220, floor: 1, poi: true, emoji: "🏧", name: "Банкомат" }
+};
+
+const EDGES = [
+  ["GJ_TL","GJ_TM"], ["GJ_TM","GJ_TR"], ["GJ_ML","GJ_MM"], ["GJ_MM","GJ_MR"],
+  ["GJ_BL","GJ_BM"], ["GJ_BM","GJ_BR"], ["GJ_TL","GJ_ML"], ["GJ_ML","GJ_BL"],
+  ["GJ_TM","GJ_MM"], ["GJ_MM","GJ_BM"], ["GJ_TR","GJ_MR"], ["GJ_MR","GJ_BR"],
+  ["STR_T","GJ_TM"], ["STR_L","GJ_TL"], ["STR_L","GJ_ML"], ["STR_L","GJ_BL"],
+  ["STR_R","GJ_TR"], ["STR_R","GJ_MR"], ["STR_R","GJ_BR"], ["STR_B","GJ_BM"],
+  ["O_entrance","GJ_MM"], ["O_mig","GJ_TM"], ["O_banket","GJ_TM"], ["O_banket","GJ_TR"],
+  ["D_k1","GJ_BM"], ["D_k2","GJ_ML"], ["D_k2","GJ_MM"], ["D_k3","GJ_ML"],
+  ["D_k4","GJ_TL"], ["D_k5","GJ_TL"], ["D_k6","GJ_TM"], ["D_k7","GJ_TM"],
+  ["D_k8","GJ_TR"], ["D_k9","GJ_MR"], ["D_k9","GJ_BR"],
+  ["D_k1","S_k1_f1"], ["D_k2","S_k2_f1"], ["D_k3","S_k3_f1"], ["D_k4","S_k4_f1"],
+  ["D_k5","S_k5_f1"], ["D_k6","S_k6_f1"], ["D_k7","S_k7_f1"], ["D_k8","S_k8_f1"],
+  ["D_k9","S_k9_f1"],
+  ["S_k1_f1","S_k1_f2"], ["S_k1_f2","S_k1_f3"],
+  ["S_k2_f1","S_k2_f2"],
+  ["S_k3_f1","S_k3_f2"], ["S_k3_f2","S_k3_f3"],
+  ["S_k4_f1","S_k4_f2"],
+  ["S_k6_f1","S_k6_f2"],
+  ["S_k7_f1","S_k7_f2"], ["S_k7_f2","S_k7_f3"],
+  ["S_k8_f1","S_k8_f2"], ["S_k8_f2","S_k8_f3"], ["S_k8_f3","S_k8_f4"], ["S_k8_f4","S_k8_f5"],
+  ["S_k9_f1","S_k9_f2"], ["S_k9_f2","S_k9_f3"], ["S_k9_f3","S_k9_f4"], ["S_k9_f4","S_k9_f5"],
+  ["S_k1_f1","P_k1_f1_med"], ["S_k1_f1","P_k1_f1_profkom"],
+  ["S_k1_f2","P_k1_f2_buh"], ["S_k1_f3","P_k1_f3_lang"],
+  ["S_k2_f2","P_k2_f2_bufet"],
+  ["S_k3_f2","P_k3_f2_stol"], ["S_k3_f3","P_k3_f3_akt"], ["S_k3_f3","P_k3_f3_fiz"],
+  ["S_k4_f1","P_k4_f1_bufet"],
+  ["S_k5_f1","P_k5_f1"],
+  ["S_k6_f2","P_k6_f2_priem"], ["S_k6_f2","P_k6_f2_bufet"],
+  ["S_k7_f2","P_k7_f2_lib"], ["S_k7_f3","P_k7_f3_lib"],
+  ["S_k8_f2","P_k8_f2_bufet"],
+  ["S_k8_f4","P_k8_f4_lab1"], ["S_k8_f4","P_k8_f4_lab2"],
+  ["S_k8_f5","P_k8_f5_lect"], ["S_k8_f5","P_k8_f5_lab"],
+  ["S_k9_f2","P_k9_f2"],
+  ["S_k9_f4","P_k9_f4_aud1"], ["S_k9_f4","P_k9_f4_aud2"],
+  ["S_k9_f5","P_k9_f5_aud1"], ["S_k9_f5","P_k9_f5_aud2"]
+];
+
+/* ============================================================
+   ПЕРЕХОДЫ с якорными точками на границах корпусов
+   ============================================================ */
+const PASSAGES = [
+  { from: "S_k1_f2", to: "S_k8_f2", floor: 2, label: "2 эт.",
+    via: [[570, 470], [880, 440]] },
+  { from: "S_k1_f2", to: "S_k9_f2", floor: 2, label: "2 эт.",
+    via: [[570, 490], [590, 490]] },
+  { from: "S_k9_f3", to: "S_k8_f3", floor: 3, label: "3 эт.",
+    via: [[880, 460], [880, 440]] },
+  { from: "S_k9_f5", to: "S_k8_f5", floor: 5, label: "5 эт.",
+    via: [[880, 460], [880, 440]] },
+  { from: "S_k8_f1", to: "S_k7_f1", floor: 1, label: "1 эт.",
+    via: [[880, 165], [790, 165]] },
+  { from: "S_k8_f2", to: "S_k7_f2", floor: 2, label: "2 эт.",
+    via: [[880, 165], [790, 165]] },
+  { from: "S_k8_f3", to: "S_k7_f3", floor: 3, label: "3 эт.",
+    via: [[880, 165], [790, 165]] },
+  { from: "S_k7_f1", to: "S_k6_f1", floor: 1, label: "подз.", underground: true,
+    via: [[510, 160], [490, 160]] },
+  { from: "S_k6_f2", to: "S_k2_f2", floor: 2, label: "2 эт.",
+    via: [[327, 190], [327, 220]] },
+  { from: "S_k2_f2", to: "S_k1_f2", floor: 2, label: "2 эт.",
+    via: [[295, 440], [295, 460]] },
+  { from: "S_k2_f2", to: "S_k3_f2", floor: 2, label: "2 эт.",
+    via: [[245, 330], [230, 330]] },
+  { from: "S_k3_f2", to: "S_k4_f2", floor: 2, label: "2 эт.",
+    via: [[145, 220], [145, 190]] }
+];
+
+const PASSAGE_SET = new Set();
+PASSAGES.forEach(p => {
+  EDGES.push([p.from, p.to]);
+  PASSAGE_SET.add(p.from + "|" + p.to);
+  PASSAGE_SET.add(p.to + "|" + p.from);
+});
+function isPassage(a, b) { return PASSAGE_SET.has(a + "|" + b); }
+function isStairEdge(a, b) {
+  const na = NODES[a], nb = NODES[b];
+  return na && nb && na.stairs && nb.stairs && na.building === nb.building && na.floor !== nb.floor;
+}
+function isIndoorNode(id) {
+  return id.startsWith("S_") || id.startsWith("P_");
+}
+
+const ADJ = {};
+Object.keys(NODES).forEach(id => ADJ[id] = []);
+EDGES.forEach(([a, b]) => {
+  if (!NODES[a] || !NODES[b]) return;
+  ADJ[a].push(b); ADJ[b].push(a);
+});
+
+function dist(a, b) {
+  const p = NODES[a], q = NODES[b];
+  return Math.hypot(p.x - q.x, p.y - q.y);
+}
+
+/* ============================================================
+   ГЛОБАЛЬНЫЕ РЕЖИМЫ
+   ============================================================ */
+let indoorOnly = false;
+
+/* ============================================================
+   A*
+   ============================================================ */
+function findPath(startId, goalId) {
+  if (startId === goalId) return [startId];
+  const g = {}, f = {}, prev = {};
+  const open = new Set([startId]);
+  const closed = new Set();
+  Object.keys(NODES).forEach(id => { g[id] = Infinity; f[id] = Infinity; });
+  g[startId] = 0;
+  f[startId] = dist(startId, goalId);
+
+  while (open.size) {
+    let cur = null, best = Infinity;
+    open.forEach(id => { if (f[id] < best) { best = f[id]; cur = id; } });
+    if (cur === goalId) {
+      const path = [cur]; let c = cur;
+      while (prev[c]) { c = prev[c]; path.unshift(c); }
+      return path;
+    }
+    open.delete(cur); closed.add(cur);
+
+    for (const nb of ADJ[cur]) {
+      if (closed.has(nb)) continue;
+
+      // ===== INDOOR-ONLY: пропускаем всё, что не внутри корпуса =====
+      // Исключение: цель и старт могут быть любыми (однако при построении indoor-only
+      // мы их автоматически заменим на ближайшие внутренние точки, так что это условие
+      // здесь в основном для случаев когда сами точки уже indoor).
+      if (indoorOnly && !isIndoorNode(nb)) continue;
+
+      let multiplier = 1;
+      if (isPassage(cur, nb)) multiplier = 0.85;
+      else if (isStairEdge(cur, nb)) multiplier = 0.9;
+
+      const tg = g[cur] + dist(cur, nb) * multiplier;
+      if (tg < g[nb]) {
+        prev[nb] = cur;
+        g[nb] = tg;
+        f[nb] = tg + dist(nb, goalId);
+        open.add(nb);
+      }
+    }
+  }
+  return null;
+}
+
+/* Находит ближайший indoor POI (P_*) к точке (x, y) */
+function nearestIndoorPoi(x, y) {
+  let best = null, bestD = Infinity;
+  Object.entries(NODES).forEach(([id, n]) => {
+    if (!id.startsWith("P_")) return;
+    const d = Math.hypot(n.x - x, n.y - y);
+    if (d < bestD) { bestD = d; best = id; }
+  });
+  return best;
+}
+
+/* ============================================================
+   SVG
+   ============================================================ */
+const SVG_NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("map");
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+const defs = el("defs", {}, svg);
+const gridPat = el("pattern", { id: "grid", width: 40, height: 40, patternUnits: "userSpaceOnUse" }, defs);
+el("path", { d: "M 40 0 L 0 0 0 40", fill: "none", stroke: "#141416", "stroke-width": 0.5 }, gridPat);
+
+const gStreets   = el("g", {}, svg);
+const gWalk      = el("g", {}, svg);
+const gBuildings = el("g", {}, svg);
+const gPassages  = el("g", {}, svg);
+const gDoors     = el("g", {}, svg);
+const gStairs    = el("g", {}, svg);
+const gPois      = el("g", {}, svg);
+const gPath      = el("g", {}, svg);
+const gMarkers   = el("g", {}, svg);
+
+el("rect", { x: 0, y: 0, width: 1200, height: 720, fill: "#0A0A0C" }, gStreets);
+el("rect", { x: 40, y: 55, width: 1120, height: 610, fill: "url(#grid)", opacity: 0.7 }, gStreets);
+
+function streetRect(x, y, w, h) {
+  const g = el("g", { "data-floor": "1" }, gStreets);
+  el("rect", { x, y, width: w, height: h, rx: 6, fill: "#232326" }, g);
+  el("rect", { x: x + 3, y: y + 3, width: w - 6, height: h - 6, rx: 4, fill: "#2A2A2E" }, g);
+}
+streetRect(0, 30, 1200, 26);
+streetRect(8, 30, 26, 660);
+streetRect(1166, 30, 26, 660);
+streetRect(0, 664, 1200, 26);
+
+const gStreetLbl = el("g", { "data-floor": "1" }, gStreets);
+const l1 = el("text", { x: 600, y: 24, "text-anchor": "middle", class: "streets-label" }, gStreetLbl);
+l1.textContent = "ул. Карла Маркса";
+const l2 = el("text", { x: 21, y: 360, "text-anchor": "middle", class: "streets-label", transform: "rotate(-90 21 360)" }, gStreetLbl);
+l2.textContent = "ул. Пушкина";
+const l3 = el("text", { x: 1179, y: 360, "text-anchor": "middle", class: "streets-label", transform: "rotate(90 1179 360)" }, gStreetLbl);
+l3.textContent = "ул. Коммунистическая";
+
+EDGES.forEach(([a, b]) => {
+  const isGround = id => /^GJ_/.test(id) || /^STR_/.test(id);
+  if (!isGround(a) || !isGround(b)) return;
+  const p = NODES[a], q = NODES[b];
+  const g = el("g", { "data-floor": "1" }, gWalk);
+  el("line", { x1: p.x, y1: p.y, x2: q.x, y2: q.y, stroke: "#3A3A3E", "stroke-width": 2 }, g);
+});
+
+// Здания
+Object.entries(BUILDINGS).forEach(([id, b]) => {
+  const g = el("g", { "data-building": id, "data-floors": b.floors.join(",") }, gBuildings);
+  if (b.shape === "rect") {
+    el("rect", { x: b.x, y: b.y, width: b.w, height: b.h, rx: 10, ry: 10,
+      fill: b.fill, "fill-opacity": 0.85,
+      stroke: "rgba(255,255,255,0.15)", "stroke-width": 1 }, g);
+  } else {
+    el("path", { d: b.d, fill: b.fill, "fill-opacity": 0.85,
+      stroke: "rgba(255,255,255,0.15)", "stroke-width": 1 }, g);
+  }
+  const lx = b.labelX ?? (b.x + b.w / 2);
+  const ly = b.labelY ?? (b.y + b.h / 2 + 5);
+  const t = el("text", { x: lx, y: ly, "text-anchor": "middle", class: "building-label" }, g);
+  t.textContent = b.label;
+});
+
+/* ============================================================
+   ПЕРЕХОДЫ — полилиния через якоря
+   ============================================================ */
+const passageElems = {};
+
+PASSAGES.forEach(p => {
+  const a = NODES[p.from], b = NODES[p.to];
+  const via = p.via || [];
+
+  let d = `M ${a.x},${a.y}`;
+  via.forEach(([x, y]) => { d += ` L ${x},${y}`; });
+  d += ` L ${b.x},${b.y}`;
+
+  const g = el("g", { "data-passage-floor": String(p.floor) }, gPassages);
+  passageElems[p.from + "|" + p.to] = g;
+  passageElems[p.to + "|" + p.from] = g;
+
+  // Тёмный контур
+  el("path", { d, fill: "none",
+    stroke: "#000000", "stroke-width": 10,
+    "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0.7 }, g);
+
+  // Подсветка
+  el("path", { d, fill: "none",
+    stroke: "#FFD60A", "stroke-width": 8,
+    "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0.3,
+    class: "pass-bg" }, g);
+
+  // Пунктир
+  el("path", { d, fill: "none",
+    stroke: "#FFD60A", "stroke-width": 4,
+    "stroke-dasharray": "10 7",
+    "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 1,
+    class: "pass-line" }, g);
+
+  // Точки на концах
+  el("circle", { cx: a.x, cy: a.y, r: 5, fill: "#FFD60A", stroke: "#1A1A1C", "stroke-width": 1.5 }, g);
+  el("circle", { cx: b.x, cy: b.y, r: 5, fill: "#FFD60A", stroke: "#1A1A1C", "stroke-width": 1.5 }, g);
+
+  // Точки на якорях
+  via.forEach(([x, y]) => {
+    el("circle", { cx: x, cy: y, r: 4, fill: "#FFD60A", stroke: "#1A1A1C", "stroke-width": 1.5 }, g);
+  });
+
+  // Бейдж посередине между якорями (или между концами)
+  let bx, by;
+  if (via.length >= 2) {
+    bx = (via[0][0] + via[1][0]) / 2;
+    by = (via[0][1] + via[1][1]) / 2;
+  } else {
+    bx = (a.x + b.x) / 2;
+    by = (a.y + b.y) / 2;
+  }
+
+  const labelText = (p.underground ? "🕳️ " : "🚶 ") + p.label;
+  const badgeW = labelText.length * 6 + 18;
+  const badgeH = 22;
+
+  el("rect", { x: bx - badgeW / 2, y: by - badgeH / 2,
+    width: badgeW, height: badgeH, rx: 11,
+    fill: "#FFD60A", stroke: "#1A1A1C", "stroke-width": 2 }, g);
+
+  const badge = el("text", { x: bx, y: by + 4,
+    "text-anchor": "middle", "font-size": 11, "font-weight": 800,
+    fill: "#1A1A1C", "pointer-events": "none" }, g);
+  badge.textContent = labelText;
+
+  const title = el("title", {}, g);
+  title.textContent = `Переход ${p.label} (${a.building?.toUpperCase()} → ${b.building?.toUpperCase()})`;
+});
+
+// Двери
+Object.entries(NODES).forEach(([id, n]) => {
+  if (!id.startsWith("D_")) return;
+  const g = el("g", { "data-floor": "1" }, gDoors);
+  el("circle", { cx: n.x, cy: n.y, r: 4.5, fill: "#0A84FF", stroke: "#FFFFFF", "stroke-width": 1.5 }, g);
+});
+
+// Лестницы
+Object.entries(NODES).forEach(([id, n]) => {
+  if (!n.stairs) return;
+  const g = el("g", { "data-floor": String(n.floor) }, gStairs);
+  el("circle", { cx: n.x, cy: n.y, r: 11, fill: "#FF9F0A", stroke: "#FFFFFF", "stroke-width": 2 }, g);
+  const t = el("text", { x: n.x, y: n.y + 4, "text-anchor": "middle", class: "stair-icon" }, g);
+  t.textContent = "≣";
+});
+
+// POI
+Object.entries(NODES).forEach(([id, n]) => {
+  if (!n.poi) return;
+  const wrap = el("g", { transform: `translate(${n.x},${n.y})`, "data-floor": String(n.floor) }, gPois);
+  const inner = el("g", { class: "poi-inner", "data-node": id }, wrap);
+  el("circle", { cx: 0, cy: 0, r: 14, fill: "rgba(0,0,0,0.55)", stroke: "rgba(255,255,255,0.1)", "stroke-width": 1 }, inner);
+  el("circle", { cx: 0, cy: 0, r: 12, fill: "#FFFFFF", stroke: "rgba(0,0,0,0.15)", "stroke-width": 1 }, inner);
+  const t = el("text", { x: 0, y: 1, "text-anchor": "middle", "dominant-baseline": "middle", "font-size": 14 }, inner);
+  t.textContent = n.emoji || "📍";
+  const title = el("title", {}, inner);
+  title.textContent = n.name || id;
+});
+
+/* ============================================================
+   ЭТАЖИ
+   ============================================================ */
+let currentFloor = 1;
+const overlayEl = document.getElementById("floorOverlay");
+const overlayBadge = document.getElementById("floorOverlayBadge");
+let fadeTimer = null;
+
+function applyFloor(f) {
+  currentFloor = f;
+  svg.querySelectorAll("[data-floor]").forEach(e => {
+    e.style.display = e.getAttribute("data-floor") === String(f) ? "" : "none";
+  });
+  svg.querySelectorAll("[data-floors]").forEach(e => {
+    const list = e.getAttribute("data-floors").split(",");
+    const has = list.indexOf(String(f)) >= 0;
+    e.style.opacity = has ? 1 : 0.08;
+    e.style.transition = "opacity 0.3s";
+  });
+  svg.querySelectorAll("[data-passage-floor]").forEach(e => {
+    const pf = e.getAttribute("data-passage-floor");
+    e.style.opacity = pf === String(f) ? 1 : 0.12;
+    e.style.transition = "opacity 0.3s";
+  });
+  document.querySelectorAll("#floorSelector button").forEach(b => {
+    b.classList.toggle("active", parseInt(b.getAttribute("data-floor"), 10) === f);
+  });
+  refreshMarkers();
+  if (lastPath) drawPath(lastPath);
+}
+function setFloorInstant(f) { applyFloor(f); }
+function setFloorAnimated(f) {
+  if (f === currentFloor) return;
+  overlayBadge.textContent = "Этаж " + f;
+  overlayEl.classList.add("visible");
+  clearTimeout(fadeTimer);
+  fadeTimer = setTimeout(() => {
+    applyFloor(f);
+    setTimeout(() => overlayEl.classList.remove("visible"), 120);
+  }, 150);
+}
+document.getElementById("floorSelector").addEventListener("click", e => {
+  if (e.target.tagName === "BUTTON") {
+    setFloorAnimated(parseInt(e.target.getAttribute("data-floor"), 10));
+  }
+});
+
+/* ============================================================
+   ПУТЬ
+   ============================================================ */
+const pathGlow = el("path", { id: "pathGlow", d: "", fill: "none", stroke: "#0A84FF",
+  "stroke-width": 18, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0 }, gPath);
+const pathLine = el("path", { id: "pathLine", d: "", fill: "none", stroke: "#0A84FF",
+  "stroke-width": 7, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0 }, gPath);
+
+let lastPath = null;
+
+function roundedPath(pts, radius) {
+  if (pts.length < 2) return "";
+  if (pts.length === 2) return `M ${pts[0].x},${pts[0].y} L ${pts[1].x},${pts[1].y}`;
+  let d = `M ${pts[0].x},${pts[0].y}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i - 1], c = pts[i], n = pts[i + 1];
+    const dx1 = p.x - c.x, dy1 = p.y - c.y;
+    const dx2 = n.x - c.x, dy2 = n.y - c.y;
+    const l1 = Math.hypot(dx1, dy1), l2 = Math.hypot(dx2, dy2);
+    if (l1 < 0.1 || l2 < 0.1) { d += ` L ${c.x},${c.y}`; continue; }
+    const r = Math.min(radius, l1 / 2, l2 / 2);
+    const ax = c.x + (dx1 / l1) * r, ay = c.y + (dy1 / l1) * r;
+    const bx = c.x + (dx2 / l2) * r, by = c.y + (dy2 / l2) * r;
+    d += ` L ${ax},${ay} Q ${c.x},${c.y} ${bx},${by}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L ${last.x},${last.y}`;
+  return d;
+}
+
+function segmentByFloor(path) {
+  const segs = [];
+  let cur = null;
+  path.forEach(id => {
+    const f = NODES[id].floor;
+    if (!cur || cur.floor !== f) {
+      cur = { floor: f, nodes: [id] };
+      segs.push(cur);
+    } else {
+      cur.nodes.push(id);
+    }
+  });
+  return segs;
+}
+
+function resetPassageHighlights() {
+  Object.values(passageElems).forEach(g => {
+    if (!g) return;
+    const line = g.querySelector(".pass-line");
+    const bg = g.querySelector(".pass-bg");
+    if (line) { line.setAttribute("stroke", "#FFD60A"); }
+    if (bg)   { bg.setAttribute("stroke", "#FFD60A"); }
+  });
+}
+function highlightPassage(from, to) {
+  const g = passageElems[from + "|" + to];
+  if (!g) return;
+  const line = g.querySelector(".pass-line");
+  const bg = g.querySelector(".pass-bg");
+  if (line) { line.setAttribute("stroke", "#30D158"); }
+  if (bg)   { bg.setAttribute("stroke", "#30D158"); }
+}
+
+function drawPath(path) {
+  lastPath = path;
+  gPath.querySelectorAll(".floor-path, .floor-badge").forEach(el => el.remove());
+  pathGlow.setAttribute("opacity", 0);
+  pathLine.setAttribute("opacity", 0);
+
+  resetPassageHighlights();
+  const segs = segmentByFloor(path);
+
+  for (let i = 1; i < path.length; i++) {
+    if (isPassage(path[i - 1], path[i])) highlightPassage(path[i - 1], path[i]);
+  }
+
+  segs.forEach(seg => {
+    if (seg.floor !== currentFloor) return;
+    if (seg.nodes.length < 2) return;
+    const pts = seg.nodes.map(id => NODES[id]);
+    const d = roundedPath(pts, 14);
+
+    const grp = el("g", { class: "floor-path" }, gPath);
+    el("path", { d, fill: "none", stroke: "#0A84FF", "stroke-width": 16,
+      "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0.45 }, grp);
+    const line = el("path", { d, fill: "none", stroke: "#0A84FF", "stroke-width": 7,
+      "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 1 }, grp);
+
+    try {
+      const len = line.getTotalLength();
+      line.style.strokeDasharray = len;
+      line.style.strokeDashoffset = len;
+      line.style.transition = "none";
+      line.getBoundingClientRect();
+      line.style.transition = "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)";
+      line.style.strokeDashoffset = 0;
+    } catch(e) {}
+  });
+
+  const grpBadges = el("g", { class: "floor-badge" }, gPath);
+  segs.forEach((seg, i) => {
+    const lastNode = NODES[seg.nodes[seg.nodes.length - 1]];
+    const firstNode = NODES[seg.nodes[0]];
+    if (i < segs.length - 1 && lastNode.floor === currentFloor) {
+      const nextFloor = segs[i + 1].floor;
+      const up = nextFloor > lastNode.floor;
+      drawFloorBadge(grpBadges, lastNode.x + 20, lastNode.y - 22,
+        (up ? "↑ " : "↓ ") + nextFloor + " эт.", up ? "#30D158" : "#FF9F0A");
+    }
+    if (i > 0 && firstNode.floor === currentFloor) {
+      const prevFloor = segs[i - 1].floor;
+      const cameUp = prevFloor < firstNode.floor;
+      drawFloorBadge(grpBadges, firstNode.x + 20, firstNode.y + 28,
+        (cameUp ? "↓ из " : "↑ из ") + prevFloor + " эт.", cameUp ? "#FF9F0A" : "#30D158");
+    }
+  });
+}
+
+function drawFloorBadge(parent, x, y, text, color) {
+  const pad = 8;
+  const w = text.length * 6 + pad * 2;
+  const h = 20;
+  el("rect", { x: x - pad, y: y - h / 2, width: w, height: h, rx: 10,
+    fill: color, stroke: "#fff", "stroke-width": 1.5, opacity: 0.98 }, parent);
+  const t = el("text", { x: x - pad + w / 2, y: y + 4, "text-anchor": "middle",
+    class: "floor-badge-text" }, parent);
+  t.textContent = text;
+}
+
+function clearPath() {
+  lastPath = null;
+  gPath.innerHTML = "";
+  gPath.appendChild(pathGlow);
+  gPath.appendChild(pathLine);
+  resetPassageHighlights();
+}
+
+/* ============================================================
+   МАРКЕРЫ
+   ============================================================ */
+function clearMarkers() { gMarkers.innerHTML = ""; }
+function drawStartMarker(x, y) {
+  const g = el("g", { class: "start-marker" }, gMarkers);
+  el("circle", { cx: x, cy: y, r: 13, fill: "#0A84FF", stroke: "#FFFFFF", "stroke-width": 3.5 }, g);
+  el("circle", { cx: x, cy: y, r: 4, fill: "#FFFFFF" }, g);
+}
+function drawEndMarker(x, y) {
+  const g = el("g", { class: "end-marker" }, gMarkers);
+  el("circle", { cx: x, cy: y, r: 13, fill: "#FF453A", stroke: "#FFFFFF", "stroke-width": 3.5 }, g);
+  el("circle", { cx: x, cy: y, r: 4, fill: "#FFFFFF" }, g);
+}
+function refreshMarkers() {
+  clearMarkers();
+  if (currentStart && NODES[currentStart] && NODES[currentStart].floor === currentFloor) {
+    drawStartMarker(NODES[currentStart].x, NODES[currentStart].y);
+  }
+  if (currentGoal && NODES[currentGoal] && NODES[currentGoal].floor === currentFloor) {
+    drawEndMarker(NODES[currentGoal].x, NODES[currentGoal].y);
+  }
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+const statusEl = document.getElementById("status");
+const perfEl   = document.getElementById("perfStat");
+const startSel = document.getElementById("startSelect");
+const goalSel  = document.getElementById("goalSelect");
+const hoverEl  = document.getElementById("hoverCoords");
+
+let currentStart = null;
+let currentGoal  = null;
+let clickMode    = "start";
+
+function setStatus(text, type) {
+  statusEl.textContent = text;
+  statusEl.className = "status" + (type ? " " + type : "");
+}
+function describe(id) {
+  if (!id || !NODES[id]) return "—";
+  return NODES[id].name || id;
+}
+
+const POI_LIST = [];
+Object.entries(NODES).forEach(([id, n]) => {
+  if (n.poi && n.name) POI_LIST.push({ id, name: n.name, emoji: n.emoji || "📍", floor: n.floor });
+});
+POI_LIST.sort((a, b) => a.name.localeCompare(b.name));
+
+POI_LIST.forEach(p => {
+  startSel.appendChild(new Option(`${p.emoji} ${p.name}`, p.id));
+  goalSel.appendChild(new Option(`${p.emoji} ${p.name}`, p.id));
+});
+
+startSel.value = "O_entrance";
+goalSel.value = "P_k8_f5_lect";
+currentStart = "O_entrance";
+currentGoal = "P_k8_f5_lect";
+
+svg.addEventListener("click", e => {
+  const t = e.target.closest(".poi-inner");
+  if (!t) return;
+  onPoiClick(t.getAttribute("data-node"));
+});
+svg.addEventListener("mousemove", e => {
+  const t = e.target.closest(".poi-inner");
+  if (t) {
+    const n = NODES[t.getAttribute("data-node")];
+    hoverEl.textContent = n ? `${n.name} · ${n.floor} эт.` : "—";
+    svg.style.cursor = "pointer";
+  } else {
+    hoverEl.textContent = "—";
+    svg.style.cursor = "default";
+  }
+});
+svg.addEventListener("mouseleave", () => { hoverEl.textContent = "—"; });
+
+function onPoiClick(nodeId) {
+  if (clickMode === "start") {
+    if (nodeId === currentGoal) { setStatus("Старт и цель не могут совпадать.", "error"); return; }
+    currentStart = nodeId;
+    startSel.value = nodeId;
+    clickMode = "goal";
+  } else {
+    if (nodeId === currentStart) { setStatus("Старт и цель не могут совпадать.", "error"); return; }
+    currentGoal = nodeId;
+    goalSel.value = nodeId;
+    clickMode = "start";
+  }
+  setStatus("Старт: " + describe(currentStart) + " → Цель: " + describe(currentGoal));
+  refreshMarkers();
+}
+
+/* ============================================================
+   ПОИСК
+   ============================================================ */
+let playTimer = null;
+let isPlaying = false;
+
+function runSearch() {
+  if (!currentStart || !currentGoal) { setStatus("Укажите точки.", "error"); return; }
+  if (currentStart === currentGoal) { setStatus("Старт и цель совпадают.", "error"); return; }
+
+  // ===== INDOOR-ONLY: снапим start/goal на ближайшие внутренние POI =====
+  let startNode = currentStart;
+  let goalNode = currentGoal;
+  let snapNote = "";
+
+  if (indoorOnly) {
+    if (!isIndoorNode(startNode)) {
+      const n = NODES[startNode];
+      const near = nearestIndoorPoi(n.x, n.y);
+      if (near) {
+        snapNote += ` · старт → ${NODES[near].name}`;
+        startNode = near;
+      }
+    }
+    if (!isIndoorNode(goalNode)) {
+      const n = NODES[goalNode];
+      const near = nearestIndoorPoi(n.x, n.y);
+      if (near) {
+        snapNote += ` · цель → ${NODES[near].name}`;
+        goalNode = near;
+      }
+    }
+  }
+
+  stopPlay();
+
+  const t0 = performance.now();
+  const path = findPath(startNode, goalNode);
+  const dt = performance.now() - t0;
+  if (!path) {
+    if (indoorOnly) {
+      setStatus("Нет пути только по корпусам. Попробуйте выключить режим.", "error");
+    } else {
+      setStatus("Маршрут не найден.", "error");
+    }
+    return;
+  }
+
+  let meters = 0, doorsPassed = 0, passagesUsed = 0, stairsUsed = 0;
+  for (let i = 1; i < path.length; i++) {
+    meters += dist(path[i - 1], path[i]);
+    if (isPassage(path[i - 1], path[i])) passagesUsed++;
+    if (isStairEdge(path[i - 1], path[i])) stairsUsed++;
+  }
+  path.forEach(id => { if (id.startsWith("D_")) doorsPassed++; });
+  meters = Math.round(meters);
+
+  setFloorInstant(NODES[startNode].floor);
+  drawPath(path);
+  refreshMarkers();
+
+  perfEl.innerHTML = `A*: <b>${dt.toFixed(2)} мс</b> · ${meters} м`;
+
+  const pInfo = passagesUsed ? ` · переходов: ${passagesUsed}` : "";
+  const sInfo = stairsUsed ? ` · лестниц: ${stairsUsed}` : "";
+  const dInfo = doorsPassed ? ` · дверей: ${doorsPassed}` : "";
+  const floorsVisited = new Set(path.map(id => NODES[id].floor));
+  const fInfo = floorsVisited.size > 1 ? ` · этажей: ${[...floorsVisited].sort().join(",")}` : "";
+  const mode = indoorOnly ? "🏢 только внутри" : "";
+
+  setStatus(
+    (mode ? `[${mode}] ` : "") +
+    `Маршрут: ${meters} м · ${path.length - 1} сегм. · ${dt.toFixed(2)} мс${pInfo}${sInfo}${dInfo}${fInfo}${snapNote}`,
+    "success"
+  );
+
+  if (floorsVisited.size > 1) {
+    document.getElementById("playBtn").classList.add("visible");
+  } else {
+    document.getElementById("playBtn").classList.remove("visible");
+  }
+}
+
+function getFloorsSequence(path) {
+  const seq = [];
+  path.forEach(id => {
+    const f = NODES[id].floor;
+    if (seq.length === 0 || seq[seq.length - 1] !== f) seq.push(f);
+  });
+  return seq;
+}
+
+function playRoute() {
+  if (isPlaying) { stopPlay(); return; }
+  if (!lastPath) return;
+  const seq = getFloorsSequence(lastPath);
+  if (seq.length < 2) return;
+  isPlaying = true;
+  const btn = document.getElementById("playBtn");
+  btn.classList.add("playing");
+  btn.textContent = "⏸ Остановить";
+  let i = 0;
+  function next() {
+    if (!isPlaying) return;
+    if (i >= seq.length) { stopPlay(); return; }
+    setFloorAnimated(seq[i]);
+    i++;
+    playTimer = setTimeout(next, 1700);
+  }
+  next();
+}
+function stopPlay() {
+  isPlaying = false;
+  clearTimeout(playTimer);
+  const btn = document.getElementById("playBtn");
+  btn.classList.remove("playing");
+  btn.textContent = "▶ Воспроизвести по этажам";
+}
+
+/* ============================================================
+   TOGGLE «Только внутри корпусов»
+   ============================================================ */
+const indoorBtn = document.getElementById("indoorOnlyBtn");
+const indoorHint = document.getElementById("indoorOnlyHint");
+const indoorState = document.getElementById("indoorOnlyState");
+
+function updateIndoorUI() {
+  indoorBtn.classList.toggle("active", indoorOnly);
+  indoorState.textContent = indoorOnly ? "ВКЛ" : "ВЫКЛ";
+  indoorHint.textContent = indoorOnly
+    ? "Маршрут не выходит на улицу — только переходы"
+    : "Обычный маршрут (можно по улице)";
+}
+
+indoorBtn.addEventListener("click", () => {
+  indoorOnly = !indoorOnly;
+  updateIndoorUI();
+
+  if (indoorOnly) {
+    // Снап-подготовка: предупредим, если старт/цель снаружи
+    const sOut = currentStart && !isIndoorNode(currentStart);
+    const gOut = currentGoal && !isIndoorNode(currentGoal);
+    if (sOut || gOut) {
+      setStatus("Режим «только внутри»: старт/цель будут перенесены в ближайшую аудиторию.", "");
+    } else {
+      setStatus("Режим: только внутри корпусов", "");
+    }
+  } else {
+    setStatus("Режим: обычный маршрут", "");
+  }
+
+  if (currentStart && currentGoal && lastPath) {
+    runSearch();
+  }
+});
+
+/* ============================================================
+   СОБЫТИЯ
+   ============================================================ */
+document.getElementById("buildBtn").addEventListener("click", () => {
+  currentStart = startSel.value;
+  currentGoal  = goalSel.value;
+  runSearch();
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  stopPlay();
+  clearPath();
+  clearMarkers();
+  currentStart = null;
+  currentGoal = null;
+  clickMode = "start";
+  setFloorInstant(1);
+  setStatus("Выберите точки на карте или в списках.");
+  perfEl.innerHTML = "—";
+  document.getElementById("playBtn").classList.remove("visible");
+});
+
+document.getElementById("swapBtn").addEventListener("click", () => {
+  const tmp = currentStart;
+  currentStart = currentGoal;
+  currentGoal = tmp;
+  if (currentStart) startSel.value = currentStart;
+  if (currentGoal)  goalSel.value  = currentGoal;
+  refreshMarkers();
+  setStatus("Старт: " + describe(currentStart) + " → Цель: " + describe(currentGoal));
+});
+
+document.getElementById("playBtn").addEventListener("click", playRoute);
+
+startSel.addEventListener("change", () => {
+  currentStart = startSel.value;
+  clickMode = "goal";
+  if (NODES[currentStart]) setFloorAnimated(NODES[currentStart].floor);
+});
+goalSel.addEventListener("change", () => {
+  currentGoal = goalSel.value;
+  clickMode = "start";
+  if (NODES[currentGoal]) setFloorAnimated(NODES[currentGoal].floor);
+});
+
+/* ============================================================
+   ИНИЦИАЛИЗАЦИЯ
+   ============================================================ */
+setFloorInstant(1);
+refreshMarkers();
+updateIndoorUI();
+setStatus("Старт: " + describe(currentStart) + " → Цель: " + describe(currentGoal));
+
+console.log("✅ Граф: " + Object.keys(NODES).length + " узлов, " + EDGES.length + " рёбер");
+console.log("✅ POI: " + POI_LIST.length);
+console.log("✅ Переходов: " + PASSAGES.length);
+console.log("✅ Indoor-узлы (S_*, P_*): " + Object.keys(NODES).filter(isIndoorNode).length);
+</script>
+</body>
+</html>
